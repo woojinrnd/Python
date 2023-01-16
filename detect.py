@@ -158,7 +158,7 @@ def run(
         t1 = time_sync()
         im = torch.from_numpy(im).to(device)
         im = im.half() if model.fp16 else im.float()  # uint8 to fp16/32
-        im /= 255  # 0 - 255 to 0.0 - 1.0
+        im /= 255  # 0 - 255 to 0.0 - 1.0 #정규화
         if len(im.shape) == 3:
             im = im[None]  # expand for batch dim
         t2 = time_sync()
@@ -183,7 +183,12 @@ def run(
         for i, det in enumerate(pred):  # per image
             seen += 1
             if webcam:  # batch_size >= 1
-                p, im0, frame = path[i], im0s[i].copy(), dataset.count
+                false_frame = [dataset.count] # kwj
+                avg_frame = int(sum(false_frame) / len(false_frame)) # kwj
+                # print(false_frame)
+                # print(avg_frame)
+                p, im0, frame = path[i], im0s[i].copy(), avg_frame #kwj
+                # p, im0, frame = path[i], im0s[i].copy(), dataset.count # Origin
                 s += f'{i}: '
             else:
                 p, im0, frame = path, im0s.copy(), getattr(dataset, 'frame', 1)
@@ -211,7 +216,7 @@ def run(
                 # Print results
                 for c in det[:, -1].unique():
                     n = (det[:, -1] == c).sum()  # detections per class
-                    s += f"{n} {names[int(c)]}{'s' * (n > 1)}, "  # add to string
+                    s += f"{n} {names[int(c)]}{'s' * (n >= 0)}, "  # add to string
                     
 
 
@@ -325,12 +330,9 @@ def run(
                             #real_total = sum(total_wound)
                             #print(real_total)
                             # LOGGER.info(f'{int(real_total)}')
-                                
-                                
-
                         # Button
                         if names[c] in active_buttons:
-                            
+
                             
                             #kwj_origin
                             # #c = int(cls)  # integer class
@@ -339,7 +341,7 @@ def run(
                             # LOGGER.info(f'{s}Done. ({t3 - t2:.3f}s)') #kwj
                             # cv2.putText(im0, f'{s}Done',(150,400), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2) # kwj_total_wound_per_frame
 
-                            # 20 frame
+                            # 20 frame 의 사진 저장
                             # count = 0 
                             # if (int(frame) % 20 == 0):
                             #     print('Saved frame number : ' + str(int(frame)))
@@ -351,19 +353,33 @@ def run(
                             # node 프레임마다 감지 
                             count = 0
                             node_point = 5
+                            total_frame = 20
+                            
+                            
 
 
+                            # #kwj_1212
+                            # frame_box = []
+                        
+                            # frame_box.append(int(frame))
+                            # current_frame = frame_box[0]
+                            # print(frame_box)
+                            # print("current frame : ", current_frame)
+                            
+                        
+
+                            # if ((int(frame)+1) % node_point == 0 ):
                             if ((int(frame)+1) % node_point == 0 ):
                                 label = None if hide_labels else (names[c] if hide_conf else f'{names[c]} {conf:.2f}') # 라벨링
                                 annotator.box_label(xyxy, label, color=colors(c, True)) # 박스 그리기
                                 LOGGER.info(f'{s}Done. ({t3 - t2:.3f}s)') #kwj 몇개, 탐지 시간 출력
                                 cv2.putText(im0, f'{s}Done',(150,400), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2) # kwj_total_wound_per_frame
-                                count += 1
+                                count = count + 1
 
-                                #print("n_type :", n.dtype)
-                                #print("n :", n)
+                                # print("n_type :", n.dtype)
+                                # print("n :", n)
                                 node_frame_wound = n.tolist()
-                                #print("node_frame_wound : ", type(node_frame_wound))
+                                # print("node_frame_wound : ", type(node_frame_wound))
                                 
                                 # wound_que.append(node_frame_wound)
 
@@ -378,30 +394,34 @@ def run(
                                 
 
                             # [5frame_wound, 10frame_wound, 15frame_wound 20frame_wound]
-                            if ((int(frame)+1) % 20 == 0):
+                            if ((int(frame)+1) % total_frame == 0):
                                 
                                 wound_per_20frame = sum(wound_que)
                                 print("-------20프레임합계----------- 20frame_sum_total :", wound_per_20frame)
                                 cv2.putText(im0, f'20frame_wound : {int(wound_per_20frame)}', (150, 300), cv2.FONT_HERSHEY_SIMPLEX, 1, (0,100,200), 2) # kwj_sum_wound for 20frame
                                 #print(type(frame_wound))
-                                if (len(wound_que) != 0):
-                                    wound_que.clear() # que초기화
+                                wound_que.clear() # que초기화
+
+
+                                # if (len(wound_que) != 0):
+                                    # wound_que.clear() # que초기화
+                                    # wound_que = deque(maxlen = 4)
                                 print("------초기화------reset_wound: ", wound_que)
 
                                 
                                 #품질
-                                if (wound_per_20frame <= 3):
+                                if (wound_per_20frame <= 10):
                                     print("-------------상------------- 총 개수 : ", wound_per_20frame)
                                     # 일정 프레임동안 화면상에 표시하고 싶음
-                                    cv2.putText(im0, f'BEST', (150, 400), cv2.FONT_HERSHEY_SIMPLEX, 3, (0, 0, 0), 4) # 상
+                                    cv2.putText(im0, f'BEST', (200, 360), cv2.FONT_HERSHEY_SIMPLEX, 2, (0, 0, 0), 4) # 상
 
                                 elif (wound_per_20frame <= 5):
                                     print("-------------중------------- 총 개수 : ", wound_per_20frame)
-                                    cv2.putText(im0, f'BETTER', (150, 400), cv2.FONT_HERSHEY_SIMPLEX, 3, (0, 0, 0), 4) # 중
+                                    cv2.putText(im0, f'BETTER', (200, 360), cv2.FONT_HERSHEY_SIMPLEX, 2, (0, 0, 0), 4) # 중
                                 
                                 else:
                                     print("-------------하-------------총 개수 : ", wound_per_20frame)
-                                    cv2.putText(im0, f'GOOD', (150, 400), cv2.FONT_HERSHEY_SIMPLEX, 3, (0, 0, 0), 4) # 하
+                                    cv2.putText(im0, f'GOOD', (200, 360), cv2.FONT_HERSHEY_SIMPLEX, 2, (0, 0, 0), 4) # 하
 
 
                             if save_crop:
